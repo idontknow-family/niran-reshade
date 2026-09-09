@@ -3,9 +3,9 @@ $ErrorActionPreference = 'SilentlyContinue'
 
 # -- Apply CMD Black Theme ------------------------------------------
 try {
-    $host.UI.RawUI.BackgroundColor = 'Black'
-    $host.UI.RawUI.ForegroundColor = 'White'
-    Clear-Host
+    [Console]::BackgroundColor = 'Black'
+    [Console]::ForegroundColor = 'White'
+    [Console]::Clear()
 } catch {}
 
 $scriptStartTime = Get-Date
@@ -25,9 +25,9 @@ $host.UI.RawUI.WindowTitle = "Niran ReShade Online Installer"
 
 # -- Minimalist Header ----------------------------------------------
 Write-Host ""
-Write-Host "  NIRAN RESHADE " -NoNewline -ForegroundColor Cyan
-Write-Host "| Online Auto-Installer" -ForegroundColor DarkGray
-Write-Host "  ----------------------------------------------------" -ForegroundColor DarkGray
+Write-Host "  ============================================================" -ForegroundColor Cyan
+Write-Host "   N I R A N   R E S H A D E   A U T O - I N S T A L L E R" -ForegroundColor White
+Write-Host "  ============================================================" -ForegroundColor Cyan
 Write-Host ""
 
 # -- Environment Check ----------------------------------------------
@@ -48,7 +48,6 @@ Write-Host "  [1/3] Downloading & Extracting core files ... " -NoNewline -Foregr
 try {
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
-    # ใช้ curl.exe โหลดไฟล์ในเบื้องหลังแบบเงียบ 100% ไม่พึ่งพา PowerShell UI
     if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
         curl.exe -s -L -o "$tempZip" "$zipUrl"
     } else {
@@ -73,9 +72,9 @@ try {
 
 # -- Step 2: Real-time Logging --------------------------------------
 Write-Host "  [2/3] Real-time Log Verification" -ForegroundColor White
-Write-Host "        > Status: " -NoNewline -ForegroundColor DarkGray
+Write-Host "        > Status : " -NoNewline -ForegroundColor DarkGray
 Write-Host "Waiting for FiveM launch..." -ForegroundColor Cyan
-Write-Host "        > Action: Please launch FiveM now." -ForegroundColor Gray
+Write-Host "        > Action : Please launch FiveM now." -ForegroundColor Gray
 Write-Host ""
 
 $idFound = $false
@@ -107,7 +106,7 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
                 $idString = $Matches[0]
                 $fullBypassLine = "$idString acknowledged that ReShade 5.x has a bug that will lead to game crashes"
 
-                Write-Host "        > Unique Device ID: " -NoNewline -ForegroundColor DarkGray
+                Write-Host "        > Device ID : " -NoNewline -ForegroundColor DarkGray
                 Write-Host "$idString" -ForegroundColor Cyan
 
                 # -- Step 3: Patching CitizenFX.ini -----------------
@@ -140,20 +139,26 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
     $elapsed += 2
 }
 
-# -- Completion Status ----------------------------------------------
+# -- Completion Status & Auto Close ---------------------------------
 Write-Host ""
-Write-Host "  ----------------------------------------------------" -ForegroundColor DarkGray
+Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
 
 if ($idFound) {
     Write-Host "  STATUS : " -NoNewline -ForegroundColor DarkGray
-    Write-Host "SUCCESSFULLY INSTALLED" -ForegroundColor Cyan
+    Write-Host "SUCCESSFULLY INSTALLED" -ForegroundColor Green
     Write-Host "  NOTE   : Press 'Home' in-game to open ReShade overlay." -ForegroundColor Gray
+    Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
+    Write-Host ""
+    for ($i = 5; $i -gt 0; $i--) {
+        Write-Host "`r  Closing window in $i seconds..." -NoNewline -ForegroundColor DarkGray
+        Start-Sleep -Seconds 1
+    }
+    exit
 } else {
     Write-Host "  STATUS : " -NoNewline -ForegroundColor DarkGray
     Write-Host "TIMED OUT" -ForegroundColor Red
     Write-Host "  NOTE   : Launch FiveM and rerun command." -ForegroundColor Gray
+    Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
+    Write-Host ""
+    Pause
 }
-
-Write-Host "  ----------------------------------------------------" -ForegroundColor DarkGray
-Write-Host ""
-Pause
