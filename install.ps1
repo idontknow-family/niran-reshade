@@ -1,9 +1,9 @@
 $ErrorActionPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'
 
-# -- Auto Pop-up to Dedicated Window -------------------------------
+# -- Auto Pop-up to Dedicated Clean Window -------------------------
 if ($env:NIRAN_RUN -ne '1') {
-    Start-Process powershell -ArgumentList "-NoExit -Command `"`$env:NIRAN_RUN='1'; irm https://raw.githubusercontent.com/idontknow-family/niran-reshade/main/install.ps1 | iex`""
+    Start-Process powershell -ArgumentList "-NoExit -Command `"`$ProgressPreference='SilentlyContinue'; `$env:NIRAN_RUN='1'; irm https://raw.githubusercontent.com/idontknow-family/niran-reshade/main/install.ps1 | iex`""
     exit
 }
 
@@ -50,7 +50,9 @@ if (-not (Test-Path $pluginsPath)) {
 Write-Host "  [1/3] Downloading & Extracting core files ... " -NoNewline -ForegroundColor White
 
 try {
-    Invoke-WebRequest -Uri $zipUrl -OutFile $tempZip -UseBasicParsing -MaximumRedirection 5 -ErrorAction Stop
+    # ใช้ WebClient ดาวน์โหลดความเร็วสูง ปิดการแสดงผลแถบฟ้า 100%
+    $webClient = New-Object System.Net.WebClient
+    $webClient.DownloadFile($zipUrl, $tempZip)
 
     if (Test-Path $tempExtract) { Remove-Item $tempExtract -Recurse -Force }
     Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force -ErrorAction Stop
