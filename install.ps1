@@ -93,9 +93,9 @@ try {
 
 # -- Step 2: Real-time Logging --------------------------------------
 Write-Host "  [2/3] Real-time Log Verification" -ForegroundColor White
-Write-Host "        > Status : " -NoNewline -ForegroundColor DarkGray
+Write-Host "         > Status : " -NoNewline -ForegroundColor DarkGray
 Write-Host "Waiting for FiveM launch..." -ForegroundColor Cyan
-Write-Host "        > Action : Please launch FiveM now." -ForegroundColor Gray
+Write-Host "         > Action : Please launch FiveM now (or reconnect to a server)." -ForegroundColor Gray
 Write-Host ""
 
 $idFound = $false
@@ -108,7 +108,7 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
         $fivemProc = Get-Process | Where-Object { $_.ProcessName -like "*FiveM*" } -ErrorAction SilentlyContinue
         if ($fivemProc -and -not $fivemDetected) {
             $fivemDetected = $true
-            Write-Host "        > FiveM session detected. Reading log stream..." -ForegroundColor DarkGray
+            Write-Host "         > FiveM session detected. Reading log stream..." -ForegroundColor DarkGray
         }
 
         $latestLog = Get-ChildItem -Path $fivemPath -Filter "*CitizenFX*.log" -Recurse -ErrorAction SilentlyContinue |
@@ -124,11 +124,12 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
             $fileStream.Close()
 
             if ($logContent -match "ReShade5=ID:([a-f0-9]+)") {
-                $idString = $Matches[0]
+                $cleanId = $Matches[1]
+                $idString = "ReShade5=ID:$cleanId"
                 $fullBypassLine = "$idString acknowledged that ReShade 5.x has a bug that will lead to game crashes"
 
-                Write-Host "        > Device ID : " -NoNewline -ForegroundColor DarkGray
-                Write-Host "$idString" -ForegroundColor Cyan
+                Write-Host "         > Device ID : " -NoNewline -ForegroundColor DarkGray
+                Write-Host "$cleanId" -ForegroundColor Cyan
 
                 # -- Step 3: Patching CitizenFX.ini -----------------
                 Write-Host ""
@@ -174,7 +175,7 @@ if ($idFound) {
         Write-Host "`r  Closing window in $i seconds..." -NoNewline -ForegroundColor DarkGray
         Start-Sleep -Seconds 1
     }
-    exit
+    [System.Environment]::Exit(0)
 } else {
     Write-Host "  STATUS : " -NoNewline -ForegroundColor DarkGray
     Write-Host "TIMED OUT" -ForegroundColor Red
