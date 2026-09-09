@@ -58,7 +58,19 @@ try {
     if (Test-Path $tempExtract) { Remove-Item $tempExtract -Recurse -Force }
     Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force -ErrorAction Stop
 
-    Get-ChildItem -Path $tempExtract | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction Stop
+    # ตรวจสอบและย้ายไฟล์ลงพาธที่ถูกต้อง (ป้องกันโฟลเดอร์ plugins ซ้อนกัน)
+    if (Test-Path "$tempExtract\plugins") {
+        Get-ChildItem -Path "$tempExtract\plugins" | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction Stop
+    } else {
+        Get-ChildItem -Path $tempExtract | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction Stop
+    }
+
+    # ทำความสะอาดกรณีมีโฟลเดอร์ plugins ซ้อนเดิมตกค้างอยู่ในเครื่อง
+    if (Test-Path "$pluginsPath\plugins") {
+        Get-ChildItem -Path "$pluginsPath\plugins" | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item "$pluginsPath\plugins" -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     Remove-Item $tempZip, $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
 
     Write-Host "Done" -ForegroundColor Cyan
