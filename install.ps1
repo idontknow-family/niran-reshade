@@ -1,4 +1,17 @@
 $ErrorActionPreference = 'SilentlyContinue'
+$ProgressPreference = 'SilentlyContinue'
+
+# -- Auto Pop-up to Dedicated Window -------------------------------
+if ($env:NIRAN_RUN -ne '1') {
+    Start-Process powershell -ArgumentList "-NoExit -Command `"`$env:NIRAN_RUN='1'; irm https://raw.githubusercontent.com/idontknow-family/niran-reshade/main/install.ps1 | iex`""
+    exit
+}
+
+# -- Style Console Like Classic CMD ---------------------------------
+$host.UI.RawUI.BackgroundColor = 'Black'
+$host.UI.RawUI.ForegroundColor = 'White'
+Clear-Host
+
 $scriptStartTime = Get-Date
 
 # ------------------------------------------------------------------
@@ -13,7 +26,6 @@ $pluginsPath = "$fivemPath\plugins"
 $iniPath     = "$fivemPath\CitizenFX.ini"
 
 $host.UI.RawUI.WindowTitle = "Niran ReShade Online Installer"
-Clear-Host
 
 # -- Minimalist Header ----------------------------------------------
 Write-Host ""
@@ -38,23 +50,18 @@ if (-not (Test-Path $pluginsPath)) {
 Write-Host "  [1/3] Downloading & Extracting core files ... " -NoNewline -ForegroundColor White
 
 try {
-    # 1. โหลดไฟล์ zip ลง Temp
     Invoke-WebRequest -Uri $zipUrl -OutFile $tempZip -UseBasicParsing -MaximumRedirection 5 -ErrorAction Stop
 
-    # 2. แตกไฟล์ zip
     if (Test-Path $tempExtract) { Remove-Item $tempExtract -Recurse -Force }
     Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force -ErrorAction Stop
 
-    # 3. ย้ายไฟล์เข้า plugins
     Get-ChildItem -Path $tempExtract | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction Stop
-
-    # 4. ลบไฟล์ขยะใน Temp
     Remove-Item $tempZip, $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
 
     Write-Host "Done" -ForegroundColor Cyan
 } catch {
     Write-Host "Failed" -ForegroundColor Red
-    Write-Host "      Could not download core files. Please check internet or GitHub URL." -ForegroundColor DarkGray
+    Write-Host "      Could not download core files. Please check internet connection." -ForegroundColor DarkGray
     Write-Host ""
     Pause
     exit
