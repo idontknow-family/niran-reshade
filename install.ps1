@@ -1,16 +1,12 @@
-$ErrorActionPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'SilentlyContinue'
 
-# -- Auto Pop-up to Dedicated Clean Window -------------------------
-if ($env:NIRAN_RUN -ne '1') {
-    Start-Process powershell -ArgumentList "-NoExit -Command `"`$ProgressPreference='SilentlyContinue'; `$env:NIRAN_RUN='1'; irm https://raw.githubusercontent.com/idontknow-family/niran-reshade/main/install.ps1 | iex`""
-    exit
-}
-
-# -- Style Console Like Classic CMD ---------------------------------
-$host.UI.RawUI.BackgroundColor = 'Black'
-$host.UI.RawUI.ForegroundColor = 'White'
-Clear-Host
+# -- Apply CMD Black Theme ------------------------------------------
+try {
+    $host.UI.RawUI.BackgroundColor = 'Black'
+    $host.UI.RawUI.ForegroundColor = 'White'
+    Clear-Host
+} catch {}
 
 $scriptStartTime = Get-Date
 
@@ -50,9 +46,15 @@ if (-not (Test-Path $pluginsPath)) {
 Write-Host "  [1/3] Downloading & Extracting core files ... " -NoNewline -ForegroundColor White
 
 try {
-    # ใช้ WebClient ดาวน์โหลดความเร็วสูง ปิดการแสดงผลแถบฟ้า 100%
-    $webClient = New-Object System.Net.WebClient
-    $webClient.DownloadFile($zipUrl, $tempZip)
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+
+    # ใช้ curl.exe โหลดไฟล์ในเบื้องหลังแบบเงียบ 100% ไม่พึ่งพา PowerShell UI
+    if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+        curl.exe -s -L -o "$tempZip" "$zipUrl"
+    } else {
+        $wc = New-Object System.Net.WebClient
+        $wc.DownloadFile($zipUrl, $tempZip)
+    }
 
     if (Test-Path $tempExtract) { Remove-Item $tempExtract -Recurse -Force }
     Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force -ErrorAction Stop
