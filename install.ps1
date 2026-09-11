@@ -1,16 +1,23 @@
 $ProgressPreference = 'SilentlyContinue'
 $ErrorActionPreference = 'SilentlyContinue'
 
-# -- Apply CMD Black Theme & Enable ANSI Colors ---------------------
 try {
     [Console]::BackgroundColor = 'Black'
     [Console]::ForegroundColor = 'White'
     [Console]::Clear()
 } catch {}
 
-$esc = [char]27
-$bobaColor = "$esc[38;2;230;204;178m" # สีชานม #e6ccb2
-$resetColor = "$esc[0m"
+# ------------------------------------------------------------------
+# BOBA MILK TEA PALETTE (RGB ANSI CODES)
+# ------------------------------------------------------------------
+$esc        = [char]27
+$cHeader    = "$esc[38;2;230;204;178m"  # ชานมพรีเมียม (#E6CCB2)
+$cMain      = "$esc[38;2;221;184;146m"  # ชาไทยนมสด (#DDB892)
+$cSub       = "$esc[38;2;166;138;110m"  # ไข่มุกบราวน์ซูการ์ (#A68A6E)
+$cHighlight = "$esc[38;2;245;235;224m"  # ฟองนมนุ่มๆ (#F5EBE0)
+$cSuccess   = "$esc[38;2;163;177;138m"  # ชาเขียวมัทฉะ (#A3B18A)
+$cError     = "$esc[38;2;224;122;95m"   # ชาไทยส้มเข้ม (#E07A5F)
+$reset      = "$esc[0m"
 
 # ------------------------------------------------------------------
 # CONFIGURATION
@@ -18,7 +25,6 @@ $resetColor = "$esc[0m"
 $zipUrl      = "https://github.com/idontknow-family/niran-reshade/releases/download/v1.0.1/Files.zip"
 $tempZip     = "$env:TEMP\boba_files.zip"
 $tempExtract = "$env:TEMP\boba_extracted"
-
 $fivemPath   = "$env:LOCALAPPDATA\FiveM\FiveM.app"
 $pluginsPath = "$fivemPath\plugins"
 $iniPath     = "$fivemPath\CitizenFX.ini"
@@ -27,14 +33,14 @@ $host.UI.RawUI.WindowTitle = "BOBA ReShade Online Installer"
 
 # -- Minimalist Header ----------------------------------------------
 Write-Host ""
-Write-Host "${bobaColor}  ============================================================${resetColor}"
-Write-Host "${bobaColor}   B O B A   R E S H A D E   A U T O - I N S T A L L E R${resetColor}"
-Write-Host "${bobaColor}  ============================================================${resetColor}"
+Write-Host "${cHeader}  ============================================================${reset}"
+Write-Host "${cHeader}   B O B A   R E S H A D E   A U T O - I N S T A L L E R${reset}"
+Write-Host "${cHeader}  ============================================================${reset}"
 Write-Host ""
 
 # -- Environment Check ----------------------------------------------
 if (-not (Test-Path $fivemPath)) {
-    Write-Host "  [!] Error: FiveM Application Data not found." -ForegroundColor Red
+    Write-Host "  ${cError}[!] Error: FiveM Application Data not found.${reset}"
     Write-Host ""
     Pause
     [System.Environment]::Exit(0)
@@ -45,7 +51,7 @@ if (-not (Test-Path $pluginsPath)) {
 }
 
 # -- Step 1: Downloading & Deploying Core Files ---------------------
-Write-Host "  [1/3] Downloading & Extracting core files ... " -NoNewline -ForegroundColor White
+Write-Host "  ${cMain}[1/3] Downloading & Extracting core files ... ${reset}" -NoNewline
 
 try {
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
@@ -60,23 +66,19 @@ try {
     if (Test-Path $tempExtract) { Remove-Item $tempExtract -Recurse -Force }
     Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force -ErrorAction Stop
 
-    # ย้ายไฟล์ลง plugins
     if (Test-Path "$tempExtract\plugins") {
         Get-ChildItem -Path "$tempExtract\plugins" | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction Stop
     } else {
         Get-ChildItem -Path $tempExtract | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction Stop
     }
 
-    # ทำความสะอาดกรณีมีโฟลเดอร์ซ้อน
     if (Test-Path "$pluginsPath\plugins") {
         Get-ChildItem -Path "$pluginsPath\plugins" | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item "$pluginsPath\plugins" -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    # ปลดล็อคไฟล์ .dll เผื่อ Windows บล็อก
     Get-ChildItem -Path $pluginsPath -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
 
-    # -- AUTO-FIX: แก้ไขไฟล์ .ini เพื่อแก้ปัญหา Path ซ้อนออโต้ --
     Get-ChildItem -Path $pluginsPath -Filter "*.ini" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
         $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
         if ($content -match "plugins[\\/]reshade-shaders") {
@@ -87,20 +89,19 @@ try {
 
     Remove-Item $tempZip, $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
 
-    Write-Host "Done" -ForegroundColor Green
+    Write-Host "${cSuccess}Done${reset}"
 } catch {
-    Write-Host "Failed" -ForegroundColor Red
-    Write-Host "      Could not download core files. Please check internet connection." -ForegroundColor DarkGray
+    Write-Host "${cError}Failed${reset}"
+    Write-Host "      ${cSub}Could not download core files. Please check internet connection.${reset}"
     Write-Host ""
     Pause
     [System.Environment]::Exit(0)
 }
 
-# -- Step 2: Real-time Logging (FIXED) -----------------------------
-Write-Host "  [2/3] Real-time Log Verification" -ForegroundColor White
-Write-Host "          > Status : " -NoNewline -ForegroundColor DarkGray
-Write-Host "Waiting for FiveM launch..." -ForegroundColor Cyan
-Write-Host "          > Action : Please launch FiveM now (or reconnect to a server)." -ForegroundColor Gray
+# -- Step 2: Real-time Logging --------------------------------------
+Write-Host "  ${cMain}[2/3] Real-time Log Verification${reset}"
+Write-Host "          ${cSub}> Status : ${reset}${cHighlight}Waiting for FiveM launch...${reset}"
+Write-Host "          ${cSub}> Action : Please launch FiveM now (or reconnect to a server).${reset}"
 Write-Host ""
 
 $idFound = $false
@@ -113,10 +114,10 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
         $fivemProc = Get-Process -Name "FiveM*" -ErrorAction SilentlyContinue
         if ($fivemProc -and -not $fivemDetected) {
             $fivemDetected = $true
-            Write-Host "          > FiveM session detected. Reading log stream..." -ForegroundColor DarkGray
+            Write-Host "          ${cSub}> FiveM session detected. Reading log stream...${reset}"
         }
 
-        # ใช้ *CitizenFX*.log เพื่อรองรับไฟล์ Log ทุกรูปแบบ
+        # ค้นหาไฟล์ Log รองรับรูปแบบ CitizenFX*.log ทุกกรณี
         $latestLog = Get-ChildItem -Path $fivemPath -Filter "*CitizenFX*.log" -Recurse -ErrorAction SilentlyContinue |
                      Sort-Object LastWriteTime -Descending |
                      Select-Object -First 1
@@ -128,20 +129,18 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
             $streamReader.Close()
             $fileStream.Close()
 
-            # หาคำว่า ReShade5=ID:... หรือ ReShade6=ID:...
+            # สแกนหา ReShade ID (รองรับทั้งเวอร์ชัน 5.x และ 6.x)
             if ($logContent -match "ReShade([0-9])=ID:([a-fA-F0-9]+)") {
                 $majorVer = $Matches[1]
                 $cleanId  = $Matches[2]
                 $idString = "ReShade${majorVer}=ID:${cleanId}"
-                
                 $fullBypassLine = "$idString acknowledged that ReShade $majorVer.x has a bug that will lead to game crashes"
 
-                Write-Host "          > Device ID : " -NoNewline -ForegroundColor DarkGray
-                Write-Host "$cleanId" -ForegroundColor Cyan
+                Write-Host "          ${cSub}> Device ID : ${reset}${cHighlight}$cleanId${reset}"
 
                 # -- Step 3: Patching CitizenFX.ini -----------------
                 Write-Host ""
-                Write-Host "  [3/3] Updating CitizenFX.ini ... " -NoNewline -ForegroundColor White
+                Write-Host "  ${cMain}[3/3] Updating CitizenFX.ini ... ${reset}" -NoNewline
 
                 if (Test-Path $iniPath) {
                     $iniContent = Get-Content $iniPath -Raw -ErrorAction SilentlyContinue
@@ -156,7 +155,7 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
                     "[Addons]`r`n$fullBypassLine" | Set-Content -Path $iniPath -Encoding utf8 -ErrorAction SilentlyContinue
                 }
 
-                Write-Host "Done" -ForegroundColor Green
+                Write-Host "${cSuccess}Done${reset}"
                 $idFound = $true
                 break
             }
@@ -169,24 +168,22 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
 
 # -- Completion Status & Auto Close ---------------------------------
 Write-Host ""
-Write-Host "${bobaColor}  ------------------------------------------------------------${resetColor}"
+Write-Host "${cHeader}  ------------------------------------------------------------${reset}"
 
 if ($idFound) {
-    Write-Host "  STATUS : " -NoNewline -ForegroundColor DarkGray
-    Write-Host "SUCCESSFULLY INSTALLED" -ForegroundColor Green
-    Write-Host "  NOTE   : Press 'Home' in-game to open ReShade overlay." -ForegroundColor Gray
-    Write-Host "${bobaColor}  ------------------------------------------------------------${resetColor}"
+    Write-Host "  ${cSub}STATUS : ${reset}${cSuccess}SUCCESSFULLY INSTALLED${reset}"
+    Write-Host "  ${cSub}NOTE   : Press 'Home' in-game to open ReShade overlay.${reset}"
+    Write-Host "${cHeader}  ------------------------------------------------------------${reset}"
     Write-Host ""
     for ($i = 5; $i -gt 0; $i--) {
-        Write-Host "`r  Closing window in $i seconds..." -NoNewline -ForegroundColor DarkGray
+        Write-Host "`r  ${cSub}Closing window in $i seconds...${reset}" -NoNewline
         Start-Sleep -Seconds 1
     }
     [System.Environment]::Exit(0)
 } else {
-    Write-Host "  STATUS : " -NoNewline -ForegroundColor DarkGray
-    Write-Host "TIMED OUT" -ForegroundColor Red
-    Write-Host "  NOTE   : Log missing or ReShade not loaded. Please try again." -ForegroundColor Gray
-    Write-Host "${bobaColor}  ------------------------------------------------------------${resetColor}"
+    Write-Host "  ${cSub}STATUS : ${reset}${cError}TIMED OUT${reset}"
+    Write-Host "  ${cSub}NOTE   : Log missing or ReShade not loaded. Please try again.${reset}"
+    Write-Host "${cHeader}  ------------------------------------------------------------${reset}"
     Write-Host ""
     Pause
     [System.Environment]::Exit(0)
