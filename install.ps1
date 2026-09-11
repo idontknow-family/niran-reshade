@@ -12,8 +12,6 @@ $esc = [char]27
 $bobaColor = "$esc[38;2;230;204;178m" # สีชานม #e6ccb2
 $resetColor = "$esc[0m"
 
-$scriptStartTime = Get-Date
-
 # ------------------------------------------------------------------
 # CONFIGURATION
 # ------------------------------------------------------------------
@@ -62,19 +60,23 @@ try {
     if (Test-Path $tempExtract) { Remove-Item $tempExtract -Recurse -Force }
     Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force -ErrorAction Stop
 
+    # ย้ายไฟล์ลง plugins
     if (Test-Path "$tempExtract\plugins") {
         Get-ChildItem -Path "$tempExtract\plugins" | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction Stop
     } else {
         Get-ChildItem -Path $tempExtract | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction Stop
     }
 
+    # ทำความสะอาดกรณีมีโฟลเดอร์ซ้อน
     if (Test-Path "$pluginsPath\plugins") {
         Get-ChildItem -Path "$pluginsPath\plugins" | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item "$pluginsPath\plugins" -Recurse -Force -ErrorAction SilentlyContinue
     }
 
+    # ปลดล็อคไฟล์ .dll เผื่อ Windows บล็อก
     Get-ChildItem -Path $pluginsPath -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
 
+    # -- AUTO-FIX: แก้ไขไฟล์ .ini เพื่อแก้ปัญหา Path ซ้อนออโต้ --
     Get-ChildItem -Path $pluginsPath -Filter "*.ini" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
         $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
         if ($content -match "plugins[\\/]reshade-shaders") {
@@ -114,26 +116,26 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
             Write-Host "         > FiveM session detected. Reading log stream..." -ForegroundColor DarkGray
         }
 
-        # กลับมาใช้ระบบหา Log ของคุณที่หาจากไฟล์ใหม่ล่าสุดจริงๆ
-        $latestLog = Get-ChildItem -Path $fivemPath -Filter "*CitizenFX*.log" -Recurse -ErrorAction SilentlyContinue |
-                     Where-Object { $_.LastWriteTime -ge $scriptStartTime.AddSeconds(-5) } |
+        # ใช้โค้ดหาไฟล์อันเดิมของคุณ แต่ลบตัวกรองเวลาออก เพื่อให้มันเจอล่าสุดเสมอ
+        $latestLog = Get-ChildItem -Path $fivemPath -Filter "CitizenFX.log" -Recurse -ErrorAction SilentlyContinue |
                      Sort-Object LastWriteTime -Descending |
                      Select-Object -First 1
 
         if ($latestLog) {
+            # ใช้ System.IO อ่านทะลุ File-Lock ตามที่คุณเขียนไว้ตอนแรก
             $fileStream = [System.IO.File]::Open($latestLog.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
             $streamReader = New-Object System.IO.StreamReader($fileStream)
             $logContent = $streamReader.ReadToEnd()
             $streamReader.Close()
             $fileStream.Close()
 
-            if ($logContent -match "(ReShade[5-9])=ID:([a-fA-F0-9]+)") {
-                $versionVer = $Matches[1]
-                $cleanId = $Matches[2]
-                $majorNum = $versionVer.Substring(7,1)
+            # หาคำว่า ReShade5=ID:... หรือ ReShade6=ID:...
+            if ($logContent -match "(ReShade[0-9]=ID:[a-fA-F0-9]+)") {
+                $idString = $Matches[1]
+                $cleanId = $idString -replace ".*ID:",""
+                $majorVer = $idString.Substring(7,1)
                 
-                $idString = "$versionVer=ID:$cleanId"
-                $fullBypassLine = "$idString acknowledged that ReShade $majorNum.x has a bug that will lead to game crashes"
+                $fullBypassLine = "$idString acknowledged that ReShade $majorVer.x has a bug that will lead to game crashes"
 
                 Write-Host "         > Device ID : " -NoNewline -ForegroundColor DarkGray
                 Write-Host "$cleanId" -ForegroundColor Cyan
@@ -146,9 +148,9 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
                     $iniContent = Get-Content $iniPath -Raw -ErrorAction SilentlyContinue
                     if ($iniContent -notmatch [regex]::Escape($idString)) {
                         if ($iniContent -notmatch "\[Addons\]") {
-                            Add-Content -Path $iniPath -Value "`r`n[Addons]`r`n$fullBypassLine" -ErrorAction SilentlyContinue
+                            Add-Content -Path $iniPath -Value "`r`n[Addons]`r`n$fullBypassLine" -Encoding utf8 -ErrorAction SilentlyContinue
                         } else {
-                            Add-Content -Path $iniPath -Value "`r`n$fullBypassLine" -ErrorAction SilentlyContinue
+                            Add-Content -Path $iniPath -Value "`r`n$fullBypassLine" -Encoding utf8 -ErrorAction SilentlyContinue
                         }
                     }
                 } else {
@@ -161,7 +163,7 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
             }
         }
     } catch {
-        # Catch lock errors
+        # ข้ามไปก่อนถ้าติด Error Lock
     }
 
     Start-Sleep -Seconds 2
