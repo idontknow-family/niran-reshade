@@ -1,33 +1,35 @@
 $ProgressPreference = 'SilentlyContinue'
 $ErrorActionPreference = 'SilentlyContinue'
 
-# -- Apply CMD Black Theme ------------------------------------------
+# -- Apply CMD Black Theme & Enable ANSI Colors ---------------------
 try {
     [Console]::BackgroundColor = 'Black'
     [Console]::ForegroundColor = 'White'
     [Console]::Clear()
 } catch {}
 
-$scriptStartTime = Get-Date
+$esc = [char]27
+$bobaColor = "$esc[38;2;230;204;178m" # สีชานม #e6ccb2
+$resetColor = "$esc[0m"
 
 # ------------------------------------------------------------------
 # CONFIGURATION
 # ------------------------------------------------------------------
 $zipUrl      = "https://github.com/idontknow-family/niran-reshade/releases/download/v1.0.1/Files.zip"
-$tempZip     = "$env:TEMP\niran_files.zip"
-$tempExtract = "$env:TEMP\niran_extracted"
+$tempZip     = "$env:TEMP\boba_files.zip"
+$tempExtract = "$env:TEMP\boba_extracted"
 
 $fivemPath   = "$env:LOCALAPPDATA\FiveM\FiveM.app"
 $pluginsPath = "$fivemPath\plugins"
 $iniPath     = "$fivemPath\CitizenFX.ini"
 
-$host.UI.RawUI.WindowTitle = "Niran ReShade Online Installer"
+$host.UI.RawUI.WindowTitle = "BOBA ReShade Online Installer"
 
 # -- Minimalist Header ----------------------------------------------
 Write-Host ""
-Write-Host "  ============================================================" -ForegroundColor Cyan
-Write-Host "   N I R A N   R E S H A D E   A U T O - I N S T A L L E R" -ForegroundColor White
-Write-Host "  ============================================================" -ForegroundColor Cyan
+Write-Host "${bobaColor}  ============================================================${resetColor}"
+Write-Host "${bobaColor}   B O B A   R E S H A D E   A U T O - I N S T A L L E R${resetColor}"
+Write-Host "${bobaColor}  ============================================================${resetColor}"
 Write-Host ""
 
 # -- Environment Check ----------------------------------------------
@@ -82,7 +84,7 @@ try {
 
     Remove-Item $tempZip, $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
 
-    Write-Host "Done" -ForegroundColor Cyan
+    Write-Host "Done" -ForegroundColor Green
 } catch {
     Write-Host "Failed" -ForegroundColor Red
     Write-Host "      Could not download core files. Please check internet connection." -ForegroundColor DarkGray
@@ -111,10 +113,13 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
             Write-Host "         > FiveM session detected. Reading log stream..." -ForegroundColor DarkGray
         }
 
-        $latestLog = Get-ChildItem -Path $fivemPath -Filter "*CitizenFX*.log" -Recurse -ErrorAction SilentlyContinue |
-                     Where-Object { $_.LastWriteTime -ge $scriptStartTime.AddSeconds(-5) } |
-                     Sort-Object LastWriteTime -Descending |
-                     Select-Object -First 1
+        # แก้บั๊กหา Log ไม่เจอ: ตัดการเช็คเวลาออก และโฟกัสที่ CitizenFX.log ไฟล์หลักโดยตรง
+        $latestLog = Get-Item -Path "$fivemPath\CitizenFX.log" -ErrorAction SilentlyContinue
+        
+        if (-not $latestLog) {
+            $latestLog = Get-ChildItem -Path $fivemPath -Filter "CitizenFX.log" -Recurse -ErrorAction SilentlyContinue |
+                         Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        }
 
         if ($latestLog) {
             $fileStream = [System.IO.File]::Open($latestLog.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
@@ -123,10 +128,14 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
             $streamReader.Close()
             $fileStream.Close()
 
-            if ($logContent -match "ReShade6=ID:([a-f0-9]+)") {
-                $cleanId = $Matches[1]
-                $idString = "ReShade6=ID:$cleanId"
-                $fullBypassLine = "$idString acknowledged that ReShade 6.x has a bug that will lead to game crashes"
+            # แก้บั๊ก Regex: รองรับทั้ง ReShade5 และ ReShade6 ป้องกันอัปเดตแล้วพังอีก
+            if ($logContent -match "(ReShade[56])=ID:([a-f0-9]+)") {
+                $versionVer = $Matches[1]
+                $cleanId = $Matches[2]
+                $majorNum = $versionVer.Substring(7,1)
+                
+                $idString = "$versionVer=ID:$cleanId"
+                $fullBypassLine = "$idString acknowledged that ReShade $majorNum.x has a bug that will lead to game crashes"
 
                 Write-Host "         > Device ID : " -NoNewline -ForegroundColor DarkGray
                 Write-Host "$cleanId" -ForegroundColor Cyan
@@ -148,7 +157,7 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
                     "[Addons]`r`n$fullBypassLine" | Set-Content -Path $iniPath -Encoding utf8 -ErrorAction SilentlyContinue
                 }
 
-                Write-Host "Done" -ForegroundColor Cyan
+                Write-Host "Done" -ForegroundColor Green
                 $idFound = $true
                 break
             }
@@ -163,13 +172,13 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
 
 # -- Completion Status & Auto Close ---------------------------------
 Write-Host ""
-Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
+Write-Host "${bobaColor}  ------------------------------------------------------------${resetColor}"
 
 if ($idFound) {
     Write-Host "  STATUS : " -NoNewline -ForegroundColor DarkGray
     Write-Host "SUCCESSFULLY INSTALLED" -ForegroundColor Green
     Write-Host "  NOTE   : Press 'Home' in-game to open ReShade overlay." -ForegroundColor Gray
-    Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
+    Write-Host "${bobaColor}  ------------------------------------------------------------${resetColor}"
     Write-Host ""
     for ($i = 5; $i -gt 0; $i--) {
         Write-Host "`r  Closing window in $i seconds..." -NoNewline -ForegroundColor DarkGray
@@ -179,8 +188,8 @@ if ($idFound) {
 } else {
     Write-Host "  STATUS : " -NoNewline -ForegroundColor DarkGray
     Write-Host "TIMED OUT" -ForegroundColor Red
-    Write-Host "  NOTE   : Launch FiveM and rerun command." -ForegroundColor Gray
-    Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
+    Write-Host "  NOTE   : Log missing or ReShade not loaded. Please try again." -ForegroundColor Gray
+    Write-Host "${bobaColor}  ------------------------------------------------------------${resetColor}"
     Write-Host ""
     Pause
     [System.Environment]::Exit(0)
