@@ -73,7 +73,10 @@ try {
         Remove-Item "$pluginsPath\plugins" -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    # -- AUTO-FIX: แก้ไขไฟล์ .ini เพื่อแก้ปัญหา Path ซ้อนออโต้ --
+    # -- AUTO-FIX 1: ปลดล็อคไฟล์จากระบบป้องกันของ Windows --
+    Get-ChildItem -Path $pluginsPath -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
+
+    # -- AUTO-FIX 2: แก้ไขไฟล์ .ini เพื่อแก้ปัญหา Path ซ้อนออโต้ --
     Get-ChildItem -Path $pluginsPath -Filter "*.ini" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
         $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
         if ($content -match "plugins[\\/]reshade-shaders") {
@@ -113,7 +116,6 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
             Write-Host "         > FiveM session detected. Reading log stream..." -ForegroundColor DarkGray
         }
 
-        # แก้บั๊กหา Log ไม่เจอ: ตัดการเช็คเวลาออก และโฟกัสที่ CitizenFX.log ไฟล์หลักโดยตรง
         $latestLog = Get-Item -Path "$fivemPath\CitizenFX.log" -ErrorAction SilentlyContinue
         
         if (-not $latestLog) {
@@ -122,14 +124,14 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
         }
 
         if ($latestLog) {
+            # ใช้วิธีอ่านไฟล์แบบแชร์เพื่อลดปัญหาการล็อคไฟล์จาก FiveM
             $fileStream = [System.IO.File]::Open($latestLog.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
             $streamReader = New-Object System.IO.StreamReader($fileStream)
             $logContent = $streamReader.ReadToEnd()
             $streamReader.Close()
             $fileStream.Close()
 
-            # แก้บั๊ก Regex: รองรับทั้ง ReShade5 และ ReShade6 ป้องกันอัปเดตแล้วพังอีก
-            if ($logContent -match "(ReShade[56])=ID:([a-f0-9]+)") {
+            if ($logContent -match "(ReShade[5-9])=ID:([a-fA-F0-9]+)") {
                 $versionVer = $Matches[1]
                 $cleanId = $Matches[2]
                 $majorNum = $versionVer.Substring(7,1)
@@ -150,7 +152,7 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
                         if ($iniContent -notmatch "\[Addons\]") {
                             Add-Content -Path $iniPath -Value "`r`n[Addons]`r`n$fullBypassLine" -ErrorAction SilentlyContinue
                         } else {
-                            Add-Content -Path $iniPath -Value "$fullBypassLine" -ErrorAction SilentlyContinue
+                            Add-Content -Path $iniPath -Value "`r`n$fullBypassLine" -ErrorAction SilentlyContinue
                         }
                     }
                 } else {
@@ -163,7 +165,7 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
             }
         }
     } catch {
-        # Catch lock errors
+        # Catch lock errors and continue
     }
 
     Start-Sleep -Seconds 2
