@@ -13,7 +13,7 @@ $scriptStartTime = Get-Date
 # ------------------------------------------------------------------
 # CONFIGURATION
 # ------------------------------------------------------------------
-$zipUrl      = "https://github.com/idontknow-family/niran-reshade/releases/download/v1.0.0/Files.zip"
+$zipUrl      = "https://github.com/idontknow-family/niran-reshade/releases/download/v1.0.1/Files.zip"
 $tempZip     = "$env:TEMP\niran_files.zip"
 $tempExtract = "$env:TEMP\niran_extracted"
 
@@ -35,7 +35,7 @@ if (-not (Test-Path $fivemPath)) {
     Write-Host "  [!] Error: FiveM Application Data not found." -ForegroundColor Red
     Write-Host ""
     Pause
-    exit
+    [System.Environment]::Exit(0)
 }
 
 if (-not (Test-Path $pluginsPath)) {
@@ -88,7 +88,7 @@ try {
     Write-Host "      Could not download core files. Please check internet connection." -ForegroundColor DarkGray
     Write-Host ""
     Pause
-    exit
+    [System.Environment]::Exit(0)
 }
 
 # -- Step 2: Real-time Logging --------------------------------------
@@ -105,7 +105,7 @@ $elapsed = 0
 
 while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
     try {
-        $fivemProc = Get-Process | Where-Object { $_.ProcessName -like "*FiveM*" } -ErrorAction SilentlyContinue
+        $fivemProc = Get-Process -Name "FiveM*" -ErrorAction SilentlyContinue
         if ($fivemProc -and -not $fivemDetected) {
             $fivemDetected = $true
             Write-Host "         > FiveM session detected. Reading log stream..." -ForegroundColor DarkGray
@@ -123,10 +123,10 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
             $streamReader.Close()
             $fileStream.Close()
 
-            if ($logContent -match "ReShade5=ID:([a-f0-9]+)") {
+            if ($logContent -match "ReShade6=ID:([a-f0-9]+)") {
                 $cleanId = $Matches[1]
-                $idString = "ReShade5=ID:$cleanId"
-                $fullBypassLine = "$idString acknowledged that ReShade 5.x has a bug that will lead to game crashes"
+                $idString = "ReShade6=ID:$cleanId"
+                $fullBypassLine = "$idString acknowledged that ReShade 6.x has a bug that will lead to game crashes"
 
                 Write-Host "         > Device ID : " -NoNewline -ForegroundColor DarkGray
                 Write-Host "$cleanId" -ForegroundColor Cyan
@@ -183,4 +183,5 @@ if ($idFound) {
     Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
     Write-Host ""
     Pause
+    [System.Environment]::Exit(0)
 }
