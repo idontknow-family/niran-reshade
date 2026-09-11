@@ -60,23 +60,19 @@ try {
     if (Test-Path $tempExtract) { Remove-Item $tempExtract -Recurse -Force }
     Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force -ErrorAction Stop
 
-    # ย้ายไฟล์ลง plugins
     if (Test-Path "$tempExtract\plugins") {
         Get-ChildItem -Path "$tempExtract\plugins" | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction Stop
     } else {
         Get-ChildItem -Path $tempExtract | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction Stop
     }
 
-    # ทำความสะอาดกรณีมีโฟลเดอร์ซ้อน
     if (Test-Path "$pluginsPath\plugins") {
         Get-ChildItem -Path "$pluginsPath\plugins" | Copy-Item -Destination $pluginsPath -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item "$pluginsPath\plugins" -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    # -- AUTO-FIX 1: ปลดล็อคไฟล์จากระบบป้องกันของ Windows --
     Get-ChildItem -Path $pluginsPath -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
 
-    # -- AUTO-FIX 2: แก้ไขไฟล์ .ini เพื่อแก้ปัญหา Path ซ้อนออโต้ --
     Get-ChildItem -Path $pluginsPath -Filter "*.ini" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
         $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
         if ($content -match "plugins[\\/]reshade-shaders") {
@@ -124,44 +120,48 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
         }
 
         if ($latestLog) {
-            # ใช้วิธีอ่านไฟล์แบบแชร์เพื่อลดปัญหาการล็อคไฟล์จาก FiveM
-            $fileStream = [System.IO.File]::Open($latestLog.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
-            $streamReader = New-Object System.IO.StreamReader($fileStream)
-            $logContent = $streamReader.ReadToEnd()
-            $streamReader.Close()
-            $fileStream.Close()
-
-            if ($logContent -match "(ReShade[5-9])=ID:([a-fA-F0-9]+)") {
-                $versionVer = $Matches[1]
-                $cleanId = $Matches[2]
-                $majorNum = $versionVer.Substring(7,1)
+            # --- แก้ไขระบบอ่านไฟล์: ใช้วิธีก๊อปปี้ไฟล์หลบการล็อคของ FiveM ---
+            $tempLogPath = "$env:TEMP\citizenfx_temp.log"
+            Copy-Item -Path $latestLog.FullName -Destination $tempLogPath -Force -ErrorAction SilentlyContinue
+            
+            if (Test-Path $tempLogPath) {
+                $logContent = Get-Content -Path $tempLogPath -Raw -ErrorAction SilentlyContinue
                 
-                $idString = "$versionVer=ID:$cleanId"
-                $fullBypassLine = "$idString acknowledged that ReShade $majorNum.x has a bug that will lead to game crashes"
+                # ปรับ Regex ให้ครอบคลุมทุก ReShade Version
+                if ($logContent -match "(ReShade[0-9]+)=ID:([a-fA-F0-9]+)") {
+                    $versionVer = $Matches[1]
+                    $cleanId = $Matches[2]
+                    $majorNum = $versionVer.Substring(7,1)
+                    
+                    $idString = "$versionVer=ID:$cleanId"
+                    $fullBypassLine = "$idString acknowledged that ReShade $majorNum.x has a bug that will lead to game crashes"
 
-                Write-Host "         > Device ID : " -NoNewline -ForegroundColor DarkGray
-                Write-Host "$cleanId" -ForegroundColor Cyan
+                    Write-Host "         > Device ID : " -NoNewline -ForegroundColor DarkGray
+                    Write-Host "$cleanId" -ForegroundColor Cyan
 
-                # -- Step 3: Patching CitizenFX.ini -----------------
-                Write-Host ""
-                Write-Host "  [3/3] Updating CitizenFX.ini ... " -NoNewline -ForegroundColor White
+                    # -- Step 3: Patching CitizenFX.ini -----------------
+                    Write-Host ""
+                    Write-Host "  [3/3] Updating CitizenFX.ini ... " -NoNewline -ForegroundColor White
 
-                if (Test-Path $iniPath) {
-                    $iniContent = Get-Content $iniPath -Raw -ErrorAction SilentlyContinue
-                    if ($iniContent -notmatch [regex]::Escape($idString)) {
-                        if ($iniContent -notmatch "\[Addons\]") {
-                            Add-Content -Path $iniPath -Value "`r`n[Addons]`r`n$fullBypassLine" -ErrorAction SilentlyContinue
-                        } else {
-                            Add-Content -Path $iniPath -Value "`r`n$fullBypassLine" -ErrorAction SilentlyContinue
+                    if (Test-Path $iniPath) {
+                        $iniContent = Get-Content $iniPath -Raw -ErrorAction SilentlyContinue
+                        if ($iniContent -notmatch [regex]::Escape($idString)) {
+                            if ($iniContent -notmatch "\[Addons\]") {
+                                Add-Content -Path $iniPath -Value "`r`n[Addons]`r`n$fullBypassLine" -ErrorAction SilentlyContinue
+                            } else {
+                                Add-Content -Path $iniPath -Value "`r`n$fullBypassLine" -ErrorAction SilentlyContinue
+                            }
                         }
+                    } else {
+                        "[Addons]`r`n$fullBypassLine" | Set-Content -Path $iniPath -Encoding utf8 -ErrorAction SilentlyContinue
                     }
-                } else {
-                    "[Addons]`r`n$fullBypassLine" | Set-Content -Path $iniPath -Encoding utf8 -ErrorAction SilentlyContinue
-                }
 
-                Write-Host "Done" -ForegroundColor Green
-                $idFound = $true
-                break
+                    Write-Host "Done" -ForegroundColor Green
+                    $idFound = $true
+                    
+                    Remove-Item $tempLogPath -Force -ErrorAction SilentlyContinue
+                    break
+                }
             }
         }
     } catch {
