@@ -12,6 +12,8 @@ $esc = [char]27
 $bobaColor = "$esc[38;2;230;204;178m" # สีชานม #e6ccb2
 $resetColor = "$esc[0m"
 
+$scriptStartTime = Get-Date
+
 # ------------------------------------------------------------------
 # CONFIGURATION
 # ------------------------------------------------------------------
@@ -112,60 +114,54 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
             Write-Host "         > FiveM session detected. Reading log stream..." -ForegroundColor DarkGray
         }
 
-        $latestLog = Get-Item -Path "$fivemPath\CitizenFX.log" -ErrorAction SilentlyContinue
-        
-        if (-not $latestLog) {
-            $latestLog = Get-ChildItem -Path $fivemPath -Filter "CitizenFX.log" -Recurse -ErrorAction SilentlyContinue |
-                         Sort-Object LastWriteTime -Descending | Select-Object -First 1
-        }
+        # กลับมาใช้ระบบหา Log ของคุณที่หาจากไฟล์ใหม่ล่าสุดจริงๆ
+        $latestLog = Get-ChildItem -Path $fivemPath -Filter "*CitizenFX*.log" -Recurse -ErrorAction SilentlyContinue |
+                     Where-Object { $_.LastWriteTime -ge $scriptStartTime.AddSeconds(-5) } |
+                     Sort-Object LastWriteTime -Descending |
+                     Select-Object -First 1
 
         if ($latestLog) {
-            # --- แก้ไขระบบอ่านไฟล์: ใช้วิธีก๊อปปี้ไฟล์หลบการล็อคของ FiveM ---
-            $tempLogPath = "$env:TEMP\citizenfx_temp.log"
-            Copy-Item -Path $latestLog.FullName -Destination $tempLogPath -Force -ErrorAction SilentlyContinue
-            
-            if (Test-Path $tempLogPath) {
-                $logContent = Get-Content -Path $tempLogPath -Raw -ErrorAction SilentlyContinue
+            $fileStream = [System.IO.File]::Open($latestLog.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+            $streamReader = New-Object System.IO.StreamReader($fileStream)
+            $logContent = $streamReader.ReadToEnd()
+            $streamReader.Close()
+            $fileStream.Close()
+
+            if ($logContent -match "(ReShade[5-9])=ID:([a-fA-F0-9]+)") {
+                $versionVer = $Matches[1]
+                $cleanId = $Matches[2]
+                $majorNum = $versionVer.Substring(7,1)
                 
-                # ปรับ Regex ให้ครอบคลุมทุก ReShade Version
-                if ($logContent -match "(ReShade[0-9]+)=ID:([a-fA-F0-9]+)") {
-                    $versionVer = $Matches[1]
-                    $cleanId = $Matches[2]
-                    $majorNum = $versionVer.Substring(7,1)
-                    
-                    $idString = "$versionVer=ID:$cleanId"
-                    $fullBypassLine = "$idString acknowledged that ReShade $majorNum.x has a bug that will lead to game crashes"
+                $idString = "$versionVer=ID:$cleanId"
+                $fullBypassLine = "$idString acknowledged that ReShade $majorNum.x has a bug that will lead to game crashes"
 
-                    Write-Host "         > Device ID : " -NoNewline -ForegroundColor DarkGray
-                    Write-Host "$cleanId" -ForegroundColor Cyan
+                Write-Host "         > Device ID : " -NoNewline -ForegroundColor DarkGray
+                Write-Host "$cleanId" -ForegroundColor Cyan
 
-                    # -- Step 3: Patching CitizenFX.ini -----------------
-                    Write-Host ""
-                    Write-Host "  [3/3] Updating CitizenFX.ini ... " -NoNewline -ForegroundColor White
+                # -- Step 3: Patching CitizenFX.ini -----------------
+                Write-Host ""
+                Write-Host "  [3/3] Updating CitizenFX.ini ... " -NoNewline -ForegroundColor White
 
-                    if (Test-Path $iniPath) {
-                        $iniContent = Get-Content $iniPath -Raw -ErrorAction SilentlyContinue
-                        if ($iniContent -notmatch [regex]::Escape($idString)) {
-                            if ($iniContent -notmatch "\[Addons\]") {
-                                Add-Content -Path $iniPath -Value "`r`n[Addons]`r`n$fullBypassLine" -ErrorAction SilentlyContinue
-                            } else {
-                                Add-Content -Path $iniPath -Value "`r`n$fullBypassLine" -ErrorAction SilentlyContinue
-                            }
+                if (Test-Path $iniPath) {
+                    $iniContent = Get-Content $iniPath -Raw -ErrorAction SilentlyContinue
+                    if ($iniContent -notmatch [regex]::Escape($idString)) {
+                        if ($iniContent -notmatch "\[Addons\]") {
+                            Add-Content -Path $iniPath -Value "`r`n[Addons]`r`n$fullBypassLine" -ErrorAction SilentlyContinue
+                        } else {
+                            Add-Content -Path $iniPath -Value "`r`n$fullBypassLine" -ErrorAction SilentlyContinue
                         }
-                    } else {
-                        "[Addons]`r`n$fullBypassLine" | Set-Content -Path $iniPath -Encoding utf8 -ErrorAction SilentlyContinue
                     }
-
-                    Write-Host "Done" -ForegroundColor Green
-                    $idFound = $true
-                    
-                    Remove-Item $tempLogPath -Force -ErrorAction SilentlyContinue
-                    break
+                } else {
+                    "[Addons]`r`n$fullBypassLine" | Set-Content -Path $iniPath -Encoding utf8 -ErrorAction SilentlyContinue
                 }
+
+                Write-Host "Done" -ForegroundColor Green
+                $idFound = $true
+                break
             }
         }
     } catch {
-        # Catch lock errors and continue
+        # Catch lock errors
     }
 
     Start-Sleep -Seconds 2
