@@ -96,11 +96,11 @@ try {
     [System.Environment]::Exit(0)
 }
 
-# -- Step 2: Real-time Logging --------------------------------------
+# -- Step 2: Real-time Logging (FIXED) -----------------------------
 Write-Host "  [2/3] Real-time Log Verification" -ForegroundColor White
-Write-Host "         > Status : " -NoNewline -ForegroundColor DarkGray
+Write-Host "          > Status : " -NoNewline -ForegroundColor DarkGray
 Write-Host "Waiting for FiveM launch..." -ForegroundColor Cyan
-Write-Host "         > Action : Please launch FiveM now (or reconnect to a server)." -ForegroundColor Gray
+Write-Host "          > Action : Please launch FiveM now (or reconnect to a server)." -ForegroundColor Gray
 Write-Host ""
 
 $idFound = $false
@@ -113,16 +113,15 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
         $fivemProc = Get-Process -Name "FiveM*" -ErrorAction SilentlyContinue
         if ($fivemProc -and -not $fivemDetected) {
             $fivemDetected = $true
-            Write-Host "         > FiveM session detected. Reading log stream..." -ForegroundColor DarkGray
+            Write-Host "          > FiveM session detected. Reading log stream..." -ForegroundColor DarkGray
         }
 
-        # ใช้โค้ดหาไฟล์อันเดิมของคุณ แต่ลบตัวกรองเวลาออก เพื่อให้มันเจอล่าสุดเสมอ
-        $latestLog = Get-ChildItem -Path $fivemPath -Filter "CitizenFX.log" -Recurse -ErrorAction SilentlyContinue |
+        # ใช้ *CitizenFX*.log เพื่อรองรับไฟล์ Log ทุกรูปแบบ
+        $latestLog = Get-ChildItem -Path $fivemPath -Filter "*CitizenFX*.log" -Recurse -ErrorAction SilentlyContinue |
                      Sort-Object LastWriteTime -Descending |
                      Select-Object -First 1
 
         if ($latestLog) {
-            # ใช้ System.IO อ่านทะลุ File-Lock ตามที่คุณเขียนไว้ตอนแรก
             $fileStream = [System.IO.File]::Open($latestLog.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
             $streamReader = New-Object System.IO.StreamReader($fileStream)
             $logContent = $streamReader.ReadToEnd()
@@ -130,14 +129,14 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
             $fileStream.Close()
 
             # หาคำว่า ReShade5=ID:... หรือ ReShade6=ID:...
-            if ($logContent -match "(ReShade[0-9]=ID:[a-fA-F0-9]+)") {
-                $idString = $Matches[1]
-                $cleanId = $idString -replace ".*ID:",""
-                $majorVer = $idString.Substring(7,1)
+            if ($logContent -match "ReShade([0-9])=ID:([a-fA-F0-9]+)") {
+                $majorVer = $Matches[1]
+                $cleanId  = $Matches[2]
+                $idString = "ReShade${majorVer}=ID:${cleanId}"
                 
                 $fullBypassLine = "$idString acknowledged that ReShade $majorVer.x has a bug that will lead to game crashes"
 
-                Write-Host "         > Device ID : " -NoNewline -ForegroundColor DarkGray
+                Write-Host "          > Device ID : " -NoNewline -ForegroundColor DarkGray
                 Write-Host "$cleanId" -ForegroundColor Cyan
 
                 # -- Step 3: Patching CitizenFX.ini -----------------
@@ -162,9 +161,7 @@ while (-not $idFound -and $elapsed -lt $timeoutSeconds) {
                 break
             }
         }
-    } catch {
-        # ข้ามไปก่อนถ้าติด Error Lock
-    }
+    } catch {}
 
     Start-Sleep -Seconds 2
     $elapsed += 2
